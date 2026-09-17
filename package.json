@@ -1,0 +1,64 @@
+{
+    "name": "net-fail-sim",
+    "version": "0.1.0",
+    "description": "Simulate network failures like delay, timeout, offline mode, and random errors for testing apps",
+    "author": "Krina Patel",
+    "license": "MIT",
+    "type": "module",
+    "main": "dist/index.js",
+    "module": "dist/index.mjs",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsup src/index.ts --format esm,cjs --dts",
+        "dev": "tsup src/index.ts --watch",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "tsc --noEmit"
+    },
+    "keywords": [
+        "network",
+        "simulation",
+        "testing",
+        "fetch",
+        "mock",
+        "chaos-engineering",
+        "latency",
+        "offline",
+        "timeout",
+        "react",
+        "axios"
+    ],
+    "exports": {
+        ".": {
+            "import": "./dist/index.mjs",
+            "require": "./dist/index.js"
+        },
+        "./react": {
+            "import": "./dist/react/index.mjs",
+            "require": "./dist/react/index.js"
+        }
+    },
+    "peerDependencies": {
+        "axios": ">=0.21.0",
+        "react": ">=17.0.0"
+    },
+    "peerDependenciesMeta": {
+        "react": {
+            "optional": true
+        },
+        "axios": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@types/react": "^18.3.31",
+        "axios": "^1.20.0",
+        "react": "^18.0.0",
+        "tsup": "^8.5.1",
+        "typescript": "^6.0.3",
+        "vitest": "^1.6.1"
+    }
+}
