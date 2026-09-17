@@ -1,7 +1,7 @@
 import { Engine } from "../core/engine.js";
 import { evaluateConfig } from "../core/modes.js";
 import { NetworkError } from "../errors/NetworkError.js";
-import type { LogEntry } from "../types/index.js";
+import type { LogEntry, RequestOutcome } from "../types/index.js";
 
 export function createFetchInterceptor(engine: Engine) {
   const originalFetch = globalThis.fetch;
@@ -17,44 +17,54 @@ export function createFetchInterceptor(engine: Engine) {
           return originalFetch(...args);
         }
 
+        const attempt = engine.incrementAttempt(url);
         const config = engine.getConfig();
-        const evaluated = evaluateConfig(url, method, config);
+        const evaluated = evaluateConfig(url, method, config, attempt);
+        const startTime = Date.now();
 
-        const logEntry: LogEntry = {
-          timestamp: Date.now(),
+        const makeLog = (outcome: RequestOutcome, extra?: Partial<LogEntry>): LogEntry => ({
+          timestamp: startTime,
           url,
           method,
-          blocked: false,
-        };
+          outcome,
+          duration: Date.now() - startTime,
+          attempt,
+          ...extra,
+        });
+
+        if (evaluated.handler) {
+          try {
+            const response = await evaluated.handler({ url, method, attempt });
+            if (response) {
+              engine.addLog(makeLog("success", { duration: Date.now() - startTime }));
+              return response;
+            }
+          } catch (err) {
+            engine.addLog(makeLog("failed", { error: (err as Error).message }));
+            throw err;
+          }
+        }
 
         if (evaluated.offline) {
-          logEntry.blocked = true;
-          logEntry.reason = "offline";
-          engine.addLog(logEntry);
+          engine.addLog(makeLog("offline"));
           throw new NetworkError("Network offline (simulated)", { url });
         }
 
         if (evaluated.delay > 0) {
           await new Promise((resolve) => setTimeout(resolve, evaluated.delay));
-          logEntry.delay = evaluated.delay;
         }
 
         if (evaluated.failRate > 0 && Math.random() < evaluated.failRate) {
-          logEntry.blocked = true;
-          logEntry.reason = "random_failure";
-          engine.addLog(logEntry);
+          engine.addLog(makeLog("failed", { error: "random_failure" }));
           throw new NetworkError("Simulated network failure", { url });
         }
 
         if (evaluated.status) {
-          logEntry.blocked = true;
-          logEntry.reason = "custom_status";
-          logEntry.status = evaluated.status;
-          engine.addLog(logEntry);
-
           const body = evaluated.responseBody
             ? JSON.stringify(evaluated.responseBody)
             : evaluated.statusText ?? "";
+
+          engine.addLog(makeLog("custom_status", { status: evaluated.status }));
 
           return new Response(body, {
             status: evaluated.status,
@@ -84,7 +94,8 @@ export function createFetchInterceptor(engine: Engine) {
         for (let i = 0; i < attempts; i++) {
           try {
             const response = await fetchWithTimeout();
-            engine.addLog(logEntry);
+            const outcome: RequestOutcome = evaluated.delay > 0 ? "delayed" : "success";
+            engine.addLog(makeLog(outcome, { duration: Date.now() - startTime }));
             return response;
           } catch (err) {
             lastError = err as Error;
@@ -94,7 +105,13 @@ export function createFetchInterceptor(engine: Engine) {
           }
         }
 
-        engine.addLog(logEntry);
+        const isTimeout = lastError?.message?.includes("timeout");
+        engine.addLog(
+          makeLog(isTimeout ? "timeout" : "failed", {
+            error: lastError?.message,
+            duration: Date.now() - startTime,
+          })
+        );
         throw lastError;
       };
     },

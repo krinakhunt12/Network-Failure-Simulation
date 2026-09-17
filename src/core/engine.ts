@@ -5,6 +5,7 @@ export class Engine {
   private config: NetFailSimConfig;
   private logs: LogEntry[] = [];
   private enabled: boolean;
+  private attemptCounts = new Map<string, number>();
 
   constructor(initialConfig: Partial<NetFailSimConfig> = {}) {
     this.config = applyPreset(createConfig(initialConfig));
@@ -25,6 +26,7 @@ export class Engine {
     this.config = applyPreset(createConfig());
     this.enabled = false;
     this.logs = [];
+    this.attemptCounts.clear();
   }
 
   configure(overrides: Partial<NetFailSimConfig>): void {
@@ -40,6 +42,25 @@ export class Engine {
 
   isEnabled(): boolean {
     return this.enabled;
+  }
+
+  getAttemptCount(url: string): number {
+    return this.attemptCounts.get(url) ?? 0;
+  }
+
+  incrementAttempt(url: string): number {
+    const current = this.attemptCounts.get(url) ?? 0;
+    const next = current + 1;
+    this.attemptCounts.set(url, next);
+    return next;
+  }
+
+  resetAttempts(url?: string): void {
+    if (url) {
+      this.attemptCounts.delete(url);
+    } else {
+      this.attemptCounts.clear();
+    }
   }
 
   addLog(entry: LogEntry): void {

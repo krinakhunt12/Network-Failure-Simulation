@@ -26,48 +26,111 @@ await fetch("https://api.example.com/data");
 sim.disable();
 ```
 
-## Features
+## Modes
 
-### Phase 1 - MVP
+| Mode | Behavior | Example |
+|------|----------|---------|
+| `offline` | Reject all requests | No network |
+| `slow` | Add latency to requests | 3-second delay |
+| `unstable` | Random failures | 30% failure rate |
+| `timeout` | Kill slow requests | 5-second timeout |
+| `server-error` | Return HTTP error status | 503 |
+| `custom` | User-defined rules | Advanced testing |
 
-- **Fetch interception** - Intercepts native `fetch` calls
-- **Offline mode** - Block all network requests
-- **Artificial delay** - Add latency to requests
-- **Enable / disable / reset** - Toggle simulation on the fly
-- **TypeScript types** - Full type support
+```ts
+sim.configure({ mode: "slow", delay: 2000 });
+sim.configure({ mode: "offline" });
+sim.configure({ mode: "server-error", status: 503 });
+```
 
-### Phase 2 - Advanced Failures
+## Presets
 
-- **Random failure rate** - Randomly fail a percentage of requests
-- **Timeout simulation** - Kill requests that take too long
-- **Custom HTTP status errors** - Return specific status codes
-- **URL pattern matching** - Apply rules to specific URLs
-- **Configurable rules** - Fine-grained control per endpoint
+```ts
+sim.configure({ preset: "slow3G" });  // 2s delay, 10% fail, 10s timeout
+sim.configure({ preset: "unstable" }); // 500ms delay, 40% fail, 3s timeout
+sim.configure({ preset: "offline" });  // Block all requests
+```
 
-### Phase 3 - Developer Experience
+## URL-based Rules
 
-- **React integration** - Provider, hooks, and dev toolbar
-- **Request logging** - Track all simulated failures
-- **Preset profiles** - Slow 3G, Unstable, Offline
+Only fail requests matching specific patterns:
+
+```ts
+const sim = createNetFailSim({
+  rules: [
+    { match: "/api/payment", offline: true },         // Block payments
+    { match: /\/api\/slow/, delay: 3000 },             // Slow endpoints
+    { match: "/api/errors", status: 500 },             // Server errors
+    { match: "/api/users", method: "POST", status: 429 }, // Rate limit POSTs
+  ],
+});
+```
+
+## Retry Testing
+
+Fail the first N attempts, then succeed:
+
+```ts
+// Global: fail first 2 attempts for all requests
+sim.configure({ failUntilAttempt: 2 });
+
+// Per-rule: fail first attempt for specific endpoints
+sim.configure({
+  rules: [
+    { match: "/api/flaky", failUntilAttempt: 3 },
+  ],
+});
+```
+
+## Custom Handlers
+
+Define your own request behavior:
+
+```ts
+sim.configure({
+  rules: [
+    {
+      match: "/api/custom",
+      handler: ({ url, method, attempt }) => {
+        if (attempt < 3) {
+          return new Response("Service unavailable", { status: 503 });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      },
+    },
+  ],
+});
+```
+
+## Request Logging
+
+Track all simulated requests with detailed outcomes:
+
+```ts
+sim.configure({ logging: true });
+
+// After making requests...
+const logs = sim.getLogs();
+// [
+//   {
+//     timestamp: 1234567890,
+//     url: "https://api.example.com/data",
+//     method: "GET",
+//     outcome: "success",  // success | failed | delayed | timeout | offline | custom_status
+//     duration: 1023,
+//     attempt: 1,
+//   },
+// ]
+
+sim.clearLogs();
+```
 
 ## API
 
 ### `createNetFailSim(config?)`
-
-Creates a simulation instance.
-
-```ts
-const sim = createNetFailSim({
-  delay: 500,        // Add 500ms delay
-  failRate: 0.2,     // 20% chance of failure
-  timeout: 3000,     // Kill requests after 3s
-  offline: true,     // Block all requests
-  preset: "slow3G",  // Use a preset profile
-  logging: true,     // Log all requests
-});
-```
-
-### Methods
 
 | Method | Description |
 |--------|-------------|
@@ -78,31 +141,10 @@ const sim = createNetFailSim({
 | `sim.getConfig()` | Get current config |
 | `sim.getLogs()` | Get request logs |
 | `sim.clearLogs()` | Clear logs |
+| `sim.getAttemptCount(url)` | Get attempt count for URL |
+| `sim.resetAttempts(url?)` | Reset attempt counter |
 
-### Rules
-
-Apply different settings to specific URLs:
-
-```ts
-const sim = createNetFailSim({
-  rules: [
-    { match: "/api/auth", offline: true },
-    { match: /\/api\/users/, delay: 2000 },
-    { match: "/api/slow", timeout: 500 },
-    { match: "/api/errors", status: 500 },
-  ],
-});
-```
-
-### Presets
-
-```ts
-sim.configure({ preset: "slow3G" });  // 2s delay, 10% fail
-sim.configure({ preset: "unstable" }); // 500ms delay, 40% fail
-sim.configure({ preset: "offline" });  // Block all requests
-```
-
-### React Integration
+## React Integration
 
 ```tsx
 import { NetFailSimProvider, DevToolbar, useNetFailSim } from "net-fail-sim/react";
@@ -111,18 +153,18 @@ function App() {
   return (
     <NetFailSimProvider config={{ delay: 1000, logging: true }}>
       <YourApp />
-      <DevToolbar />
+      <DevToolbar />  {/* Interactive floating toolbar */}
     </NetFailSimProvider>
   );
 }
 
 function YourApp() {
-  const { config, logs } = useNetFailSim();
+  const { config, logs, enable, disable, configure } = useNetFailSim();
   // ...
 }
 ```
 
-### Axios Support
+## Axios Support
 
 ```ts
 import axios from "axios";
@@ -133,6 +175,29 @@ const axiosInterceptor = createAxiosInterceptor(sim.engine);
 
 axiosInterceptor.install(axios);
 // Now axios calls are intercepted
+```
+
+## Environment Support
+
+| Environment | Support |
+|-------------|---------|
+| Browser fetch | Supported |
+| Axios | Adapter available |
+| Node.js fetch | Supported |
+| WebSocket | Out of scope |
+
+## Production Safety
+
+The library defaults to **disabled**. No requests are intercepted until you call `sim.enable()`.
+
+```ts
+// Safe to leave in production code
+const sim = createNetFailSim(); // disabled by default
+
+// Only activate in development
+if (import.meta.env.DEV) {
+  sim.enable();
+}
 ```
 
 ## License

@@ -1,7 +1,9 @@
 export type {
+  SimulationMode,
   PresetProfile,
   HttpMethod,
-  FailureType,
+  RequestOutcome,
+  CustomHandlerContext,
   FailureRule,
   NetFailSimConfig,
   LogEntry,
@@ -11,7 +13,8 @@ export type {
 export { NetworkError } from "./errors/NetworkError.js";
 export { Engine } from "./core/engine.js";
 export { createConfig, applyPreset, mergeConfig } from "./core/config.js";
-export { matchRule, evaluateConfig } from "./core/modes.js";
+export { matchRule, evaluateConfig, resolveMode } from "./core/modes.js";
+export type { EvaluatedConfig } from "./core/modes.js";
 export { createFetchInterceptor } from "./adapters/fetch.js";
 export { createAxiosInterceptor } from "./adapters/axios.js";
 
@@ -68,6 +71,15 @@ export function createNetFailSim(config: Partial<NetFailSimConfig> = {}) {
 
     clearLogs() {
       engine.clearLogs();
+      return this;
+    },
+
+    getAttemptCount(url: string) {
+      return engine.getAttemptCount(url);
+    },
+
+    resetAttempts(url?: string) {
+      engine.resetAttempts(url);
       return this;
     },
   };

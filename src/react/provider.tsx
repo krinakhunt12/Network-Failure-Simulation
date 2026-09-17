@@ -57,6 +57,18 @@ export function NetFailSimProvider({ children, config = {} }: NetFailSimProvider
     setLogs([]);
   }, [engine]);
 
+  const getAttemptCount = useCallback(
+    (url: string) => engine.getAttemptCount(url),
+    [engine]
+  );
+
+  const resetAttempts = useCallback(
+    (url?: string) => {
+      engine.resetAttempts(url);
+    },
+    [engine]
+  );
+
   useEffect(() => {
     const interval = setInterval(() => {
       setLogs(engine.getLogs());
@@ -73,6 +85,8 @@ export function NetFailSimProvider({ children, config = {} }: NetFailSimProvider
     reset,
     configure,
     clearLogs,
+    getAttemptCount,
+    resetAttempts,
   };
 
   return <NetFailSimContext.Provider value={value}>{children}</NetFailSimContext.Provider>;

@@ -11,6 +11,8 @@ export interface NetFailSimContextValue {
   reset: () => void;
   configure: (config: Partial<NetFailSimConfig>) => void;
   clearLogs: () => void;
+  getAttemptCount: (url: string) => number;
+  resetAttempts: (url?: string) => void;
 }
 
 export const NetFailSimContext = createContext<NetFailSimContextValue | null>(null);

@@ -5,19 +5,23 @@ const PRESETS: Record<Exclude<PresetProfile, "none">, Partial<NetFailSimConfig>>
     delay: 2000,
     failRate: 0.1,
     timeout: 10000,
+    mode: "slow",
   },
   unstable: {
     delay: 500,
     failRate: 0.4,
     timeout: 3000,
+    mode: "unstable",
   },
   offline: {
     offline: true,
+    mode: "offline",
   },
 };
 
 const DEFAULT_CONFIG: NetFailSimConfig = {
   enabled: false,
+  mode: "custom",
   delay: 0,
   failRate: 0,
   timeout: undefined,
@@ -26,6 +30,7 @@ const DEFAULT_CONFIG: NetFailSimConfig = {
   statusText: undefined,
   responseBody: undefined,
   retry: 0,
+  failUntilAttempt: 0,
   preset: "none",
   rules: [],
   logging: false,

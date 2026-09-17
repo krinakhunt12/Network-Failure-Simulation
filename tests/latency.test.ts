@@ -55,4 +55,16 @@ describe("Artificial delay", () => {
     expect(response.ok).toBe(true);
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it("logs delayed outcome", async () => {
+    engine.configure({ logging: true });
+    const promise = fetch("https://example.com");
+    await vi.advanceTimersByTimeAsync(500);
+    await promise;
+
+    const logs = engine.getLogs();
+    expect(logs.length).toBe(1);
+    expect(logs[0].outcome).toBe("delayed");
+    expect(logs[0].duration).toBeGreaterThanOrEqual(500);
+  });
 });

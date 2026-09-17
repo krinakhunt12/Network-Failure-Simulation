@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNetFailSim } from "./context.js";
-import type { PresetProfile } from "../types/index.js";
+import type { PresetProfile, SimulationMode, RequestOutcome } from "../types/index.js";
 
 const PRESETS: { key: PresetProfile; label: string }[] = [
   { key: "none", label: "None" },
@@ -8,6 +8,24 @@ const PRESETS: { key: PresetProfile; label: string }[] = [
   { key: "unstable", label: "Unstable" },
   { key: "offline", label: "Offline" },
 ];
+
+const MODES: { key: SimulationMode; label: string }[] = [
+  { key: "offline", label: "Offline" },
+  { key: "slow", label: "Slow" },
+  { key: "unstable", label: "Unstable" },
+  { key: "timeout", label: "Timeout" },
+  { key: "server-error", label: "Server Error" },
+  { key: "custom", label: "Custom" },
+];
+
+const OUTCOME_COLORS: Record<RequestOutcome, string> = {
+  success: "#16c784",
+  delayed: "#f0a500",
+  failed: "#e94560",
+  timeout: "#e94560",
+  offline: "#e94560",
+  custom_status: "#e94560",
+};
 
 export function DevToolbar() {
   const { config, logs, enable, disable, reset, configure, clearLogs } = useNetFailSim();
@@ -68,13 +86,34 @@ export function DevToolbar() {
           Reset
         </button>
         <span style={{ marginLeft: "auto", color: "#888" }}>
-          {expanded ? "▲" : "▼"}
+          {expanded ? "\u25B2" : "\u25BC"}
         </span>
       </div>
 
       {expanded && (
         <div style={{ padding: "8px 12px", borderTop: "1px solid #333" }}>
           <div style={{ display: "flex", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
+            <label>
+              Mode:
+              <select
+                value={config.mode ?? "custom"}
+                onChange={(e) => {
+                  const mode = e.target.value as SimulationMode;
+                  const modeConfig: Partial<import("../types/index.js").NetFailSimConfig> = { mode };
+                  if (mode === "offline") modeConfig.offline = true;
+                  else modeConfig.offline = false;
+                  configure(modeConfig);
+                }}
+                style={selectStyle}
+              >
+                {MODES.map((m) => (
+                  <option key={m.key} value={m.key}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <label>
               Preset:
               <select
@@ -132,13 +171,32 @@ export function DevToolbar() {
               ms
             </label>
 
-            <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <label>
+              Status:
               <input
-                type="checkbox"
-                checked={config.offline ?? false}
-                onChange={(e) => configure({ offline: e.target.checked })}
+                type="number"
+                value={config.status ?? ""}
+                onChange={(e) =>
+                  configure({ status: e.target.value ? Number(e.target.value) : undefined })
+                }
+                style={inputStyle}
+                min={100}
+                max={599}
+                step={1}
+                placeholder="none"
               />
-              Offline
+            </label>
+
+            <label>
+              Fail Until:
+              <input
+                type="number"
+                value={config.failUntilAttempt ?? 0}
+                onChange={(e) => configure({ failUntilAttempt: Number(e.target.value) })}
+                style={inputStyle}
+                min={0}
+                step={1}
+              />
             </label>
 
             <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -160,9 +218,13 @@ export function DevToolbar() {
                 </button>
               </div>
               {logs.slice(-20).map((log, i) => (
-                <div key={i} style={{ color: log.blocked ? "#e94560" : "#16c784" }}>
+                <div key={i} style={{ color: OUTCOME_COLORS[log.outcome] ?? "#888" }}>
                   {new Date(log.timestamp).toLocaleTimeString()} {log.method} {log.url}{" "}
-                  {log.blocked ? `[${log.reason}]` : ""} {log.delay ? `+${log.delay}ms` : ""}
+                  <span style={{ fontSize: 10 }}>[{log.outcome}]</span>{" "}
+                  {log.delay ? `+${log.delay}ms ` : ""}
+                  {log.duration ? `${log.duration}ms ` : ""}
+                  {log.attempt > 1 ? `#${log.attempt} ` : ""}
+                  {log.error ? log.error : ""}
                 </div>
               ))}
             </div>

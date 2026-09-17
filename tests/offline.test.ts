@@ -40,4 +40,12 @@ describe("Offline mode", () => {
     await fetch("https://example.com");
     expect(mockFetch).toHaveBeenCalled();
   });
+
+  it("logs offline outcome", async () => {
+    engine.configure({ logging: true });
+    await expect(fetch("https://example.com")).rejects.toThrow();
+    const logs = engine.getLogs();
+    expect(logs.length).toBe(1);
+    expect(logs[0].outcome).toBe("offline");
+  });
 });
